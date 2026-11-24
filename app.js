@@ -1,17 +1,18 @@
 /* 오늘의 운세 카드 — 백엔드 없이 브라우저에서만 동작한다.
-   저장: localStorage (오늘 뽑은 카드, 최근 7일 기록, 기기 ID) */
+   저장: localStorage (오늘 뽑은 카드, 최근 7일 기록) */
 (() => {
   'use strict';
 
   const CARDS = window.FORTUNE_CARDS;
-  const ICONS = window.FORTUNE_ICONS;
   const STORE_KEY = 'fortune-card:v1';
-  const DECK_SIZE = 16;
   const SITE_NAME = '오늘의 운세 카드';
+  // 아티팩트로 올린 버전(EMBED)은 공유 창·파일 다운로드가 막혀 있어 다르게 동작한다
+  const EMBED = Boolean(window.FORTUNE_EMBED);
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const $ = (sel) => document.querySelector(sel);
   const wait = (ms) => new Promise((r) => setTimeout(r, reduceMotion ? 0 : ms));
+  const cardSrc = (card) => `cards/${card.id}.webp`;
 
   // ── 날짜 (한국 시간 기준, 자정에 초기화) ─────────────
   function kstDate(daysAgo = 0) {
@@ -32,45 +33,17 @@
   }
 
   const state = loadState();
-  if (!state.deviceId) {
-    state.deviceId = Math.random().toString(36).slice(2) + Date.now().toString(36);
-    saveState(state);
-  }
   if (!Array.isArray(state.history)) state.history = [];
 
-  // ── 시드 기반 선택: 같은 날 같은 기기는 같은 문구 ────
-  function hash(str) {
-    let h = 2166136261;
-    for (const ch of str) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); }
-    return h >>> 0;
+  // ── 도우미 ───────────────────────────────────────────
+  function loadImage(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
   }
-  const seeded = (arr, seed) => arr[hash(seed) % arr.length];
-
-  function buildReading(card, date) {
-    const seed = `${date}|${state.deviceId}|${card.id}`;
-    const base = { good: 4, neutral: 3, caution: 2 }[card.tone];
-    return {
-      card,
-      date,
-      stars: base + (hash(seed + '|stars') % 2),
-      overall: seeded(card.overall, seed + '|overall'),
-      areas: [
-        ['연애', seeded(card.love, seed + '|love')],
-        ['금전', seeded(card.money, seed + '|money')],
-        ['일·학업', seeded(card.work, seed + '|work')],
-        ['건강', seeded(card.health, seed + '|health')]
-      ],
-      lucky: [
-        ['행운의 색', seeded(card.lucky.colors, seed + '|color')],
-        ['행운의 숫자', String(seeded(card.lucky.numbers, seed + '|number'))],
-        ['행운의 아이템', seeded(card.lucky.items, seed + '|item')]
-      ]
-    };
-  }
-
-  // ── 그리기 도우미 ────────────────────────────────────
-  const iconSvg = (id) => `<svg class="icon" viewBox="0 0 48 48" aria-hidden="true">${ICONS[id]}</svg>`;
-  const starText = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
 
   function showScreen(name) {
     for (const id of ['start', 'pick', 'result']) {
@@ -90,13 +63,12 @@
   }
 
   function makeSky() {
-    const sky = $('#sky');
     let html = '';
     for (let i = 0; i < 70; i++) {
       const big = i % 9 === 0 ? ' class="big"' : '';
       html += `<i${big} style="left:${(Math.random() * 100).toFixed(2)}%;top:${(Math.random() * 100).toFixed(2)}%;animation-delay:${(Math.random() * 4).toFixed(2)}s;animation-duration:${(3 + Math.random() * 4).toFixed(2)}s"></i>`;
     }
-    sky.innerHTML = html;
+    $('#sky').innerHTML = html;
   }
 
   // ── F2: 섞기 → 16장 펼치기 ───────────────────────────
@@ -119,7 +91,7 @@
     title.textContent = '카드를 섞는 중…';
     deck.innerHTML = '';
 
-    const picks = shuffled(CARDS).slice(0, DECK_SIZE);
+    const picks = shuffled(CARDS);
     const els = picks.map((card, i) => {
       const b = document.createElement('button');
       b.type = 'button';
@@ -143,7 +115,7 @@
       });
       const pile = (spread) => els.forEach((el, i) => {
         const j = Math.random() * 2 - 1;
-        el.style.zIndex = String(Math.floor(Math.random() * DECK_SIZE));
+        el.style.zIndex = String(Math.floor(Math.random() * els.length));
         el.style.transform = `translate(${home[i].x + j * spread}px, ${home[i].y + (Math.random() - 0.5) * 14}px) rotate(${j * 9}deg)`;
       });
 
@@ -159,7 +131,7 @@
         el.style.transition = `transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) ${i * 25}ms`;
         el.style.transform = '';
       });
-      await wait(500 + DECK_SIZE * 25);
+      await wait(500 + els.length * 25);
       els.forEach((el) => { el.style.transition = ''; el.style.zIndex = ''; });
     }
 
@@ -177,17 +149,20 @@
       if (o !== el) o.classList.add('is-dimmed');
     });
     $('#pick-title').textContent = '오늘의 카드는…';
-    el.querySelector('.card-front').innerHTML = `${iconSvg(card.id)}<span class="card-name">${card.name}</span>`;
+
+    // 앞면 그림은 고른 뒤에 불러온다 (미리 불러오면 16장 전부 받아야 한다)
+    const ready = loadImage(cardSrc(card)).catch(() => null);
 
     const r = el.getBoundingClientRect();
-    const scale = Math.min(2.4, (Math.min(window.innerWidth, 480) * 0.56) / r.width);
+    const scale = Math.min(3.2, (Math.min(window.innerWidth, 520) * 0.72) / r.width, (window.innerHeight * 0.78) / r.height);
     const dx = window.innerWidth / 2 - (r.left + r.width / 2);
     const dy = window.innerHeight / 2 - (r.top + r.height / 2);
     el.classList.add('is-chosen');
     el.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
-    await wait(550);
+    await Promise.all([wait(550), ready]);
+    el.querySelector('.card-front').style.backgroundImage = `url("${cardSrc(card)}")`;
     el.classList.add('is-flipped');
-    await wait(800 + 1000);
+    await wait(800 + 1400);
 
     // F6: 오늘 뽑은 카드 저장 + F9: 최근 7일 기록
     const date = kstDate();
@@ -195,7 +170,7 @@
     state.history = [{ date, cardId: card.id }, ...state.history.filter((h) => h.date !== date)].slice(0, 7);
     saveState(state);
 
-    showResult(buildReading(card, date), false);
+    showResult(card, date, false);
   }
 
   // ── F5: 결과 화면 ────────────────────────────────────
@@ -206,33 +181,29 @@
     let html = '';
     for (let d = 6; d >= 0; d--) {
       const date = kstDate(d);
-      const id = byDate.get(date);
-      const card = id && CARDS.find((c) => c.id === id);
+      const card = CARDS.find((c) => c.id === byDate.get(date));
       const label = `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
-      html += `<div class="${card ? 'has' : ''}${d === 0 ? ' today' : ''}" title="${card ? card.name : '기록 없음'}">`
-        + (card ? iconSvg(card.id) : '<span class="empty">·</span>')
+      html += `<div class="${card ? 'has' : ''}${d === 0 ? ' today' : ''}" title="${card ? `${card.series} · ${card.color}` : '기록 없음'}">`
+        + (card ? `<i class="swatch" style="background:${card.hex}"></i>` : '<span class="empty">·</span>')
         + `${label}</div>`;
     }
     return html;
   }
 
-  function showResult(reading, revisit) {
-    current = reading;
-    const { card } = reading;
+  function showResult(card, date, revisit) {
+    current = { card, date };
+    const alt = `${card.series} 카드. 학업운: ${card.study} 연애운: ${card.love} 우정운: ${card.friend} 오늘의 색: ${card.color}`;
     $('#result').innerHTML = `
       ${revisit ? '<p class="revisit">오늘은 이미 카드를 뽑았어요</p>' : ''}
-      <div class="bigcard">${iconSvg(card.id)}<span class="card-name">${card.name}</span></div>
-      <h2 class="result-title">${card.name} <span>— ${card.keyword}</span></h2>
-      <p class="stars" role="img" aria-label="총운 별점 5점 만점에 ${reading.stars}점">${starText(reading.stars)}</p>
-      <p class="overall">${reading.overall}</p>
+      <img id="result-card" class="result-card" src="${cardSrc(card)}" width="1024" height="1536" alt="${alt}">
+      <h2 class="result-title">${card.series}</h2>
+      <p class="result-color"><i class="swatch" style="background:${card.hex}"></i>오늘의 색 · ${card.color}</p>
       <div class="panel"><ul class="areas">
-        ${reading.areas.map(([k, v]) => `<li><b>${k}</b><span>${v}</span></li>`).join('')}
+        <li><b>학업운</b><span>${card.study}</span></li>
+        <li><b>연애운</b><span>${card.love}</span></li>
+        <li><b>우정운</b><span>${card.friend}</span></li>
       </ul></div>
-      <div class="lucky">
-        ${reading.lucky.map(([k, v]) => `<div><small>${k}</small><strong>${v}</strong></div>`).join('')}
-      </div>
-      <p class="quote">“${card.quote}”</p>
-      <p class="history-title">최근 7일 동안 뽑은 카드</p>
+      <p class="history-title">최근 7일 동안 뽑은 카드의 색</p>
       <div class="history">${historyHtml()}</div>
       <p class="disclaimer">재미로 보는 운세입니다.<br>내일(한국 시간 자정 이후) 다시 오면 새 카드를 뽑을 수 있어요.</p>
     `;
@@ -240,20 +211,8 @@
   }
 
   // ── F7: 공유 ─────────────────────────────────────────
-  // 아티팩트로 올린 버전(EMBED)은 공유 창·파일 다운로드가 막혀 있어 다르게 동작한다
-  const EMBED = Boolean(window.FORTUNE_EMBED);
   const siteUrl = () => window.FORTUNE_SHARE_URL || location.href.split(/[?#]/)[0];
-
-  function showImageOverlay(dataUrl) {
-    const wrap = document.createElement('div');
-    wrap.className = 'overlay';
-    wrap.innerHTML = '<p>이미지를 길게 누르거나 오른쪽 클릭해서 저장하세요</p><img alt="오늘의 운세 결과 이미지"><button type="button" id="btn-overlay-close">닫기</button>';
-    wrap.querySelector('img').src = dataUrl;
-    wrap.querySelector('button').addEventListener('click', () => wrap.remove());
-    document.body.append(wrap);
-    wrap.querySelector('button').focus();
-  }
-  const shareText = () => `오늘 내 운세 카드는 '${current.card.name} — ${current.card.keyword}' ${starText(current.stars)}\n“${current.card.quote}”`;
+  const shareText = () => `오늘 내 운세 카드는 '${current.card.series}' · 오늘의 색 ${current.card.color}`;
 
   async function copyLink() {
     const text = siteUrl();
@@ -280,27 +239,29 @@
     }
   }
 
-  // 결과 이미지 (1080×1920, 스토리용)를 Canvas로 직접 그린다
-  function loadIcon(id, color, size) {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="${size}" height="${size}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${ICONS[id].replaceAll('currentColor', color)}</svg>`;
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = reject;
-      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-    });
+  function showImageOverlay(src) {
+    const wrap = document.createElement('div');
+    wrap.className = 'overlay';
+    wrap.innerHTML = '<p>이미지를 길게 누르거나 오른쪽 클릭해서 저장하세요</p><img alt="오늘의 운세 결과 이미지"><button type="button" id="btn-overlay-close">닫기</button>';
+    wrap.querySelector('img').src = src;
+    wrap.querySelector('button').addEventListener('click', () => wrap.remove());
+    document.body.append(wrap);
+    wrap.querySelector('button').focus();
   }
 
-  function wrapLines(ctx, text, maxWidth) {
-    const lines = [];
-    let line = '';
-    for (const word of text.split(' ')) {
-      const next = line ? `${line} ${word}` : word;
-      if (ctx.measureText(next).width <= maxWidth || !line) line = next;
-      else { lines.push(line); line = word; }
-    }
-    if (line) lines.push(line);
-    return lines;
+  function download(href, filename) {
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = filename;
+    document.body.append(a);
+    a.click();
+    a.remove();
+  }
+
+  function hash(str) {
+    let h = 2166136261;
+    for (const ch of str) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); }
+    return h >>> 0;
   }
 
   function roundRect(ctx, x, y, w, h, r) {
@@ -313,28 +274,30 @@
     ctx.closePath();
   }
 
+  // 결과 이미지 (1080×1920, 스토리용): 밤하늘 배경 위에 뽑은 카드를 올린다
   async function saveImage() {
-    const { card, stars, date } = current;
+    const { card, date } = current;
+    const filename = `오늘의운세-${date}-${card.color}`;
     const W = 1080, H = 1920;
     const SERIF = '"Noto Serif KR", "Nanum Myeongjo", "Batang", "AppleMyungjo", serif';
     const SANS = '"Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+    const img = await loadImage(cardSrc(card));
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
 
     const bg = ctx.createLinearGradient(0, 0, W * 0.3, H);
-    bg.addColorStop(0, '#070b24'); bg.addColorStop(0.55, '#141a4a'); bg.addColorStop(1, '#2a1a55');
+    bg.addColorStop(0, '#070b24'); bg.addColorStop(0.55, '#1a1650'); bg.addColorStop(1, '#3a1d63');
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
-    // 별: 카드와 날짜로 위치를 고정해 같은 결과는 같은 그림이 나온다
     for (let i = 0; i < 140; i++) {
       const h = hash(`${card.id}|${date}|${i}`);
-      const x = h % W, y = (h >>> 11) % H, big = i % 9 === 0;
+      const big = i % 9 === 0;
       ctx.globalAlpha = 0.25 + ((h >>> 5) % 60) / 100;
       ctx.fillStyle = big ? '#e8c877' : '#ffffff';
       ctx.beginPath();
-      ctx.arc(x, y, big ? 3.2 : 2, 0, Math.PI * 2);
+      ctx.arc(h % W, (h >>> 11) % H, big ? 3.2 : 2, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
@@ -342,66 +305,48 @@
 
     ctx.fillStyle = '#e8c877';
     ctx.font = `600 40px ${SANS}`;
-    ctx.fillText(`${Number(date.slice(5, 7))}월 ${Number(date.slice(8, 10))}일 · ${SITE_NAME}`, W / 2, 200);
+    ctx.fillText(`${Number(date.slice(5, 7))}월 ${Number(date.slice(8, 10))}일 · ${SITE_NAME}`, W / 2, 150);
 
-    // 카드
-    const cw = 540, ch = 810, cx = (W - cw) / 2, cy = 300;
+    const cw = 880, ch = 1320, cx = (W - cw) / 2, cy = 220;
     ctx.save();
-    ctx.shadowColor = 'rgba(232, 200, 119, 0.45)';
+    ctx.shadowColor = card.hex;
     ctx.shadowBlur = 90;
-    const paper = ctx.createLinearGradient(0, cy, 0, cy + ch);
-    paper.addColorStop(0, '#fbf4de'); paper.addColorStop(1, '#eedfb3');
-    ctx.fillStyle = paper;
-    roundRect(ctx, cx, cy, cw, ch, 40);
+    ctx.fillStyle = '#0b1030';
+    roundRect(ctx, cx, cy, cw, ch, 52);
     ctx.fill();
     ctx.restore();
-    ctx.strokeStyle = 'rgba(42, 35, 86, 0.4)';
-    ctx.lineWidth = 3;
-    roundRect(ctx, cx + 26, cy + 26, cw - 52, ch - 52, 26);
-    ctx.stroke();
+    ctx.save();
+    roundRect(ctx, cx, cy, cw, ch, 52);
+    ctx.clip();
+    ctx.drawImage(img, cx, cy, cw, ch);
+    ctx.restore();
 
-    const icon = await loadIcon(card.id, '#2a2356', 640);
-    ctx.drawImage(icon, W / 2 - 160, cy + 190, 320, 320);
-    ctx.fillStyle = '#2a2356';
-    ctx.font = `700 68px ${SERIF}`;
-    ctx.fillText(card.name, W / 2, cy + 630);
-
-    // 카드 아래 글
     ctx.fillStyle = '#f4efe4';
-    ctx.font = `700 76px ${SERIF}`;
-    ctx.fillText(`${card.name} — ${card.keyword}`, W / 2, 1270);
-
+    ctx.font = `700 64px ${SERIF}`;
+    ctx.fillText(card.series, W / 2, 1680);
     ctx.fillStyle = '#e8c877';
-    ctx.font = `64px ${SANS}`;
-    ctx.fillText(starText(stars).split('').join(' '), W / 2, 1380);
+    ctx.font = `600 44px ${SANS}`;
+    ctx.fillText(`오늘의 색 · ${card.color}`, W / 2, 1760);
 
-    ctx.font = `600 54px ${SERIF}`;
-    const lines = wrapLines(ctx, `“${card.quote}”`, W - 240);
-    lines.forEach((line, i) => ctx.fillText(line, W / 2, 1530 + i * 80));
-
+    const host = !EMBED && location.host ? location.host + location.pathname.replace(/index\.html$/, '').replace(/\/$/, '') : '';
     ctx.fillStyle = '#b9b5d3';
-    ctx.font = `36px ${SANS}`;
-    const host = !EMBED && location.host ?location.host + location.pathname.replace(/index\.html$/, '').replace(/\/$/, '') : '';
-    ctx.fillText(host || '카드 한 장으로 보는 오늘의 운세', W / 2, H - 110);
+    ctx.font = `34px ${SANS}`;
+    ctx.fillText(host || '카드 한 장으로 보는 오늘의 운세', W / 2, H - 70);
 
-    if (EMBED) { showImageOverlay(canvas.toDataURL('image/png')); return; }
+    // 파일을 직접 열었을 때(file://)는 브라우저가 캔버스 내보내기를 막는다 → 카드 그림만 저장
+    let dataUrl;
+    try { dataUrl = canvas.toDataURL('image/png'); } catch { dataUrl = null; }
 
-    canvas.toBlob((blob) => {
-      if (!blob) { toast('이미지를 만들지 못했어요'); return; }
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `오늘의운세-${date}-${card.name}.png`;
-      document.body.append(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-      toast('이미지를 저장했어요');
-    }, 'image/png');
+    if (EMBED) { showImageOverlay(dataUrl || cardSrc(card)); return; }
+    if (dataUrl) download(dataUrl, `${filename}.png`);
+    else download(cardSrc(card), `${filename}.webp`);
+    toast('이미지를 저장했어요');
   }
 
   // ── 시작 ─────────────────────────────────────────────
   function init() {
     makeSky();
+    loadImage(window.FORTUNE_BACK).catch(() => {}); // 뒷면 그림을 미리 받아 둔다
     $('#btn-start').addEventListener('click', deal);
     $('#btn-copy').addEventListener('click', copyLink);
     $('#btn-image').addEventListener('click', () => saveImage().catch(() => toast('이미지를 만들지 못했어요')));
@@ -411,7 +356,7 @@
     // F6: 오늘 이미 뽑았으면 연출 없이 저장된 결과를 보여 준다
     const today = state.today;
     const card = today && today.date === kstDate() && CARDS.find((c) => c.id === today.cardId);
-    if (card) showResult(buildReading(card, today.date), true);
+    if (card) showResult(card, today.date, true);
     else showScreen('start');
   }
 
