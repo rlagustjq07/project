@@ -153,16 +153,28 @@
     // 앞면 그림은 고른 뒤에 불러온다 (미리 불러오면 16장 전부 받아야 한다)
     const ready = loadImage(cardSrc(card)).catch(() => null);
 
+    // 작은 카드를 늘리면 그림이 흐려진다. 그래서 처음부터 큰 크기로 만든 카드를
+    // 고른 자리에 작게 줄여 놓았다가 제 크기로 되돌린다 (최종 상태가 원래 크기라 선명하다).
     const r = el.getBoundingClientRect();
-    const scale = Math.min(3.2, (Math.min(window.innerWidth, 520) * 0.72) / r.width, (window.innerHeight * 0.78) / r.height);
-    const dx = window.innerWidth / 2 - (r.left + r.width / 2);
-    const dy = window.innerHeight / 2 - (r.top + r.height / 2);
-    el.classList.add('is-chosen');
-    el.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
-    await Promise.all([wait(550), ready]);
-    el.querySelector('.card-front').style.backgroundImage = `url("${cardSrc(card)}")`;
-    el.classList.add('is-flipped');
-    await wait(800 + 1400);
+    const w = Math.round(Math.min(Math.min(window.innerWidth, 520) * 0.72, window.innerHeight * 0.78 * (2 / 3)));
+    const h = w * 1.5;
+    const fly = document.createElement('div');
+    fly.className = 'card fly';
+    fly.innerHTML = '<span class="card-inner"><span class="card-face card-back"></span><span class="card-face card-front"></span></span>';
+    fly.style.cssText = `width:${w}px;height:${h}px;margin:${-h / 2}px 0 0 ${-w / 2}px;`;
+    const dx = r.left + r.width / 2 - window.innerWidth / 2;
+    const dy = r.top + r.height / 2 - window.innerHeight / 2;
+    fly.style.transform = `translate(${dx}px, ${dy}px) scale(${r.width / w})`;
+    document.body.append(fly);
+    el.style.visibility = 'hidden';
+    void fly.offsetWidth;
+    fly.style.transform = 'none';
+
+    await Promise.all([wait(320), ready]);
+    fly.querySelector('.card-front').style.backgroundImage = `url("${cardSrc(card)}")`;
+    fly.classList.add('is-flipped');
+    await wait(600 + 700);
+    fly.remove();
 
     // F6: 오늘 뽑은 카드 저장
     const date = kstDate();

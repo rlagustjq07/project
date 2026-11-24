@@ -185,20 +185,28 @@ h1 {
   color: inherit;
   cursor: pointer;
   perspective: 800px;
-  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease;
+  transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease;
   -webkit-tap-highlight-color: transparent;
 }
 .card:disabled { cursor: default; }
 .card:not(:disabled):hover,
 .card:not(:disabled):focus-visible { transform: translateY(-8px); }
 .card.is-dimmed { opacity: 0.18; }
-.card.is-chosen { z-index: 50; }
+/* 고른 카드: 화면 가운데에 큰 크기로 따로 띄운다 */
+.card.fly {
+  position: fixed;
+  left: 50%; top: 50%;
+  z-index: 50;
+  aspect-ratio: auto;
+  cursor: default;
+  pointer-events: none;
+}
 
 .card-inner {
   position: absolute; inset: 0;
   display: block;
   transform-style: preserve-3d;
-  transition: transform 0.8s cubic-bezier(0.3, 0.7, 0.2, 1);
+  transition: transform 0.6s cubic-bezier(0.3, 0.7, 0.2, 1);
 }
 .card.is-flipped .card-inner { transform: rotateY(180deg); }
 
