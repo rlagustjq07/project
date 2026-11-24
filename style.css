@@ -63,15 +63,74 @@ main { position: relative; z-index: 1; }
 @keyframes fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 /* ── 시작 화면 ──────────────────────────────── */
-.eyebrow {
-  margin: 0 0 12px;
-  font-size: 13px;
-  letter-spacing: 0.4em;
-  text-indent: 0.4em;
-  color: var(--gold);
+.screen-start { justify-content: flex-start; padding-top: 0; }
+
+/* 상단 바: 왼쪽에 이름표, 오른쪽에 한 줄 소개 */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding-block: 14px;
+  border-bottom: 1px solid var(--panel-line);
+  text-align: left;
 }
+.brand {
+  flex: none;
+  padding: 7px 18px;
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gold);
+  white-space: nowrap;
+}
+.tagline {
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+  word-break: keep-all;
+}
+
+/* 가운데 제목·버튼, 양옆에 기울인 카드 뒷면 */
+.hero {
+  flex: 1;
+  display: grid;
+  grid-template-columns: auto auto auto;
+  grid-template-areas: "left center right";
+  align-items: center;
+  justify-content: center;
+  gap: clamp(24px, 6vw, 72px);
+  width: 100%;
+  padding-block: 32px;
+}
+.hero-center { grid-area: center; }
+.deco-card {
+  width: clamp(96px, 15vw, 168px);
+  aspect-ratio: 2 / 3;
+  border-radius: 7% / 4.7%;
+  background: #3a1d63 url("cards/back.webp") 50% 44% / 118% 112% no-repeat;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.5), 0 0 36px rgba(160, 110, 230, 0.25);
+}
+.deco-left { grid-area: left; transform: rotate(-9deg); }
+.deco-right { grid-area: right; transform: rotate(9deg); }
+
+@media (max-width: 640px) {
+  .hero {
+    grid-template-columns: auto auto;
+    grid-template-areas: "left right" "center center";
+    row-gap: 40px;
+    column-gap: 28px;
+    align-content: center;
+  }
+  .hero-center { justify-self: center; }
+}
+
 h1 {
-  margin: 0 0 48px;
+  margin: 0 0 32px;
   font-family: var(--serif);
   font-size: clamp(32px, 9vw, 48px);
   font-weight: 700;
