@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>오늘의 운세 카드</title>
+  <meta name="description" content="카드 한 장을 골라 오늘의 운세를 확인해 보세요. 하루에 한 번, 가입 없이 바로.">
+  <meta property="og:title" content="오늘의 운세 카드">
+  <meta property="og:description" content="카드 한 장을 골라 오늘의 운세를 확인해 보세요.">
+  <meta name="theme-color" content="#0b1030">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="sky" class="sky" aria-hidden="true"></div>
+
+  <main>
+    <!-- F1 시작 화면: 배경과 버튼만 -->
+    <section id="screen-start" class="screen" hidden>
+      <p class="eyebrow">하루 한 장</p>
+      <h1>오늘의 운세 카드</h1>
+      <button id="btn-start" class="btn-primary" type="button">운세 카드 뽑으러 가기</button>
+    </section>
+
+    <!-- F2~F4 섞기 → 16장 펼치기 → 선택 → 뒤집기 -->
+    <section id="screen-pick" class="screen" hidden>
+      <h2 id="pick-title" class="pick-title" aria-live="polite">카드를 섞는 중…</h2>
+      <div id="deck" class="deck" role="group" aria-label="운세 카드 16장"></div>
+    </section>
+
+    <!-- F5 결과 화면 -->
+    <section id="screen-result" class="screen screen-result" hidden>
+      <div id="result"></div>
+    </section>
+  </main>
+
+  <!-- F7 공유: 결과 화면에서만 보임 -->
+  <div id="share-bar" class="share-bar" hidden>
+    <button id="btn-copy" type="button">링크 복사</button>
+    <button id="btn-share" type="button">공유하기</button>
+    <button id="btn-image" type="button">이미지 저장</button>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="cards.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
