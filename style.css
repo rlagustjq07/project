@@ -65,10 +65,11 @@ main { position: relative; z-index: 1; }
 /* ── 시작 화면 ──────────────────────────────── */
 .screen-start { justify-content: flex-start; padding-top: 0; }
 
-/* 상단 바: 왼쪽에 이름표, 오른쪽에 한 줄 소개 */
+/* 상단 바: 왼쪽에 한 줄 소개, 오른쪽에 이름표 */
 .topbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 16px;
   width: 100%;
   padding-block: 14px;
@@ -103,7 +104,7 @@ main { position: relative; z-index: 1; }
   grid-template-areas: "left center right";
   align-items: center;
   justify-content: center;
-  gap: clamp(24px, 6vw, 72px);
+  gap: clamp(48px, 13vw, 200px);
   width: 100%;
   padding-block: 32px;
 }
