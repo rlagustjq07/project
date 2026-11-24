@@ -65,7 +65,7 @@ main { position: relative; z-index: 1; }
 /* ── 시작 화면 ──────────────────────────────── */
 .screen-start { justify-content: flex-start; padding-top: 0; }
 
-/* 상단 바: 왼쪽에 한 줄 소개, 오른쪽에 이름표 */
+/* 상단 바: 왼쪽에 이름표, 오른쪽 끝에 한 줄 소개 */
 .topbar {
   display: flex;
   align-items: center;
@@ -94,6 +94,7 @@ main { position: relative; z-index: 1; }
   line-height: 1.5;
   color: var(--muted);
   word-break: keep-all;
+  text-align: right;
 }
 
 /* 가운데 제목·버튼, 양옆에 기울인 카드 뒷면 */
