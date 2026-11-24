@@ -1,5 +1,5 @@
 /* 오늘의 운세 카드 — 백엔드 없이 브라우저에서만 동작한다.
-   저장: localStorage (오늘 뽑은 카드, 최근 7일 기록) */
+   저장: localStorage (오늘 뽑은 카드) */
 (() => {
   'use strict';
 
@@ -33,7 +33,7 @@
   }
 
   const state = loadState();
-  if (!Array.isArray(state.history)) state.history = [];
+  delete state.history; // 예전 버전이 저장한 7일 기록은 더 쓰지 않는다
 
   // ── 도우미 ───────────────────────────────────────────
   function loadImage(src) {
@@ -164,10 +164,9 @@
     el.classList.add('is-flipped');
     await wait(800 + 1400);
 
-    // F6: 오늘 뽑은 카드 저장 + F9: 최근 7일 기록
+    // F6: 오늘 뽑은 카드 저장
     const date = kstDate();
     state.today = { date, cardId: card.id };
-    state.history = [{ date, cardId: card.id }, ...state.history.filter((h) => h.date !== date)].slice(0, 7);
     saveState(state);
 
     showResult(card, date, false);
@@ -175,20 +174,6 @@
 
   // ── F5: 결과 화면 ────────────────────────────────────
   let current = null;
-
-  function historyHtml() {
-    const byDate = new Map(state.history.map((h) => [h.date, h.cardId]));
-    let html = '';
-    for (let d = 6; d >= 0; d--) {
-      const date = kstDate(d);
-      const card = CARDS.find((c) => c.id === byDate.get(date));
-      const label = `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
-      html += `<div class="${card ? 'has' : ''}${d === 0 ? ' today' : ''}" title="${card ? `${card.series} · ${card.color}` : '기록 없음'}">`
-        + (card ? `<i class="swatch" style="background:${card.hex}"></i>` : '<span class="empty">·</span>')
-        + `${label}</div>`;
-    }
-    return html;
-  }
 
   function showResult(card, date, revisit) {
     current = { card, date };
@@ -203,11 +188,18 @@
         <li><b>연애운</b><span>${card.love}</span></li>
         <li><b>우정운</b><span>${card.friend}</span></li>
       </ul></div>
-      <p class="history-title">최근 7일 동안 뽑은 카드의 색</p>
-      <div class="history">${historyHtml()}</div>
-      <p class="disclaimer">재미로 보는 운세입니다.<br>내일(한국 시간 자정 이후) 다시 오면 새 카드를 뽑을 수 있어요.</p>
+      <button id="btn-redo" class="btn-redo" type="button">다시 뽑기</button>
+      <p class="disclaimer">재미로 보는 운세입니다.</p>
     `;
+    $('#btn-redo').addEventListener('click', redo);
     showScreen('result');
+  }
+
+  // 다시 뽑기: 오늘 기록을 지우고 카드를 새로 섞는다
+  function redo() {
+    delete state.today;
+    saveState(state);
+    deal();
   }
 
   // ── F7: 공유 ─────────────────────────────────────────
